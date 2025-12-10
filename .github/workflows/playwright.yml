@@ -215,6 +215,7 @@ jobs:
         retention-days: 30
     
     # 11. Deploy report to GitHub Pages (Optional)
+    # 11. Deploy report to GitHub Pages (FIXED VERSION)
     - name: Deploy Report to GitHub Pages
       if: success() || failure()
       uses: peaceiris/actions-gh-pages@v3
@@ -222,7 +223,11 @@ jobs:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         publish_dir: ./playwright-report
         destination_dir: ./reports/${{ github.run_id }}
-        keep_files: false
+        keep_files: true  # Changed from false to true
+        force_orphan: false  # Don't force orphan branch
+        publish_branch: gh-pages
+        user_name: 'github-actions[bot]'
+        user_email: 'github-actions[bot]@users.noreply.github.com'
     
     # 12. Send Email Notification
     - name: Send Email Notification
