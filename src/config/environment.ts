@@ -23,10 +23,10 @@ export interface EnvironmentConfig {
 }
 
 export const config: EnvironmentConfig = {
-  BASE_URL: process.env.BASE_URL! ,
-  USERNAME1: process.env.USERNAME1!,
-  PASSWORD1: process.env.PASSWORD1!,
-  ENV: process.env.ENV!,
+  BASE_URL: process.env.BASE_URL! || 'https://opensource-demo.orangehrmlive.com' ,
+  USERNAME1: process.env.USERNAME1! || 'Admin',
+  PASSWORD1: process.env.PASSWORD1! || 'admin123',
+  ENV: process.env.ENV! || 'QA',
   HEADLESS: process.env.HEADLESS !== 'false', // Default to true
   TIMEOUT: parseInt(process.env.TIMEOUT || '30000', 10)
 };
