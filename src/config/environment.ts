@@ -14,19 +14,19 @@ if (result.error) {
 }
 
 export interface EnvironmentConfig {
-  BASE_URL: string;
-  USERNAME: string;
-  PASSWORD: string;
-  ENV: string;
+  BASE_URL: string ;
+  USERNAME1: string ;
+  PASSWORD1: string ;
+  ENV: string ;
   HEADLESS: boolean;
-  TIMEOUT: number;
+  TIMEOUT: number ;
 }
 
 export const config: EnvironmentConfig = {
-  BASE_URL: process.env.BASE_URL || 'https://opensource-demo.orangehrmlive.com',
-  USERNAME:  'Admin',
-  PASSWORD: 'admin123',
-  ENV: process.env.ENV || 'dev',
+  BASE_URL: process.env.BASE_URL! ,
+  USERNAME1: process.env.USERNAME1!,
+  PASSWORD1: process.env.PASSWORD1!,
+  ENV: process.env.ENV!,
   HEADLESS: process.env.HEADLESS !== 'false', // Default to true
   TIMEOUT: parseInt(process.env.TIMEOUT || '30000', 10)
 };
@@ -35,6 +35,6 @@ export const config: EnvironmentConfig = {
 console.log('🔧 Environment Configuration:');
 console.log(`   Environment: ${config.ENV}`);
 console.log(`   Base URL: ${config.BASE_URL}`);
-console.log(`   Username: ${config.USERNAME}`);
+console.log(`   Username: ${config.USERNAME1}`);
 console.log(`   Headless: ${config.HEADLESS}`);
 console.log(`   Timeout: ${config.TIMEOUT}ms`);

@@ -1,0 +1,81 @@
+name: QA E2E Tests
+
+# TRIGGER OPTIONS (choose one):
+
+# OPTION A: Manual trigger only (simplest)
+on:
+  workflow_dispatch:    # Only manual runs from GitHub UI
+
+# OPTION B: On push to main + manual
+# on:
+#   push:
+#     branches: [ "main" ]
+#   workflow_dispatch:
+
+jobs:
+  run-qa-tests:
+    runs-on: ubuntu-latest
+    
+    steps:
+      # 1. Checkout code
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      # 2. Setup Node.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+      
+      # 3. Install dependencies
+      - name: Install dependencies
+        run: npm ci
+      
+      # 4. Install Playwright browsers
+      - name: Install Playwright
+        run: npx playwright install --with-deps chromium
+      
+      # 5. Setup QA environment (using .env.qa file)
+      - name: Setup QA Environment
+        run: |
+          # Check if .env.qa exists, if not use .env.example
+          if [ -f .env.qa ]; then
+            cp .env.qa .env
+          else
+            echo "⚠️ .env.qa not found, using .env.example"
+            cp .env.example .env
+          fi
+          echo "GITHUB_RUN_ID=${{ github.run_id }}" >> .env
+      
+      # 6. Run QA Tests
+      - name: Run Tests
+        run: npm run test:qa
+        env:
+          # If your .env.qa doesn't have these, they can be defaults
+          ENV: qa
+          HEADLESS: true
+          TIMEOUT: 30000
+      
+      # 7. Generate HTML Report (no upload needed)
+      - name: Generate Report
+        if: always()
+        run: |
+          # Create simple HTML report
+          npx playwright show-report playwright-report || true
+          
+          # Create a simple summary file
+          echo "# Test Run ${{ github.run_id }}" > test-summary.md
+          echo "Date: $(date)" >> test-summary.md
+          echo "Commit: ${{ github.sha }}" >> test-summary.md
+      
+      # 8. Upload Test Results (optional - for debugging)
+      - name: Upload Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ github.run_id }}
+          path: |
+            test-results/
+            playwright-report/
+          retention-days: 7  # Keep for 7 days only

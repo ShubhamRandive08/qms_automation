@@ -33,7 +33,7 @@ export class TestResultsHandler {
     this.version = version;
     
     this.ensureDirectoryExists(this.baseResultsPath);
-    console.log(`📂 TestResultsHandler initialized at: ${path.resolve(this.baseResultsPath)}`);
+    // console.log(`TestResultsHandler initialized at: ${path.resolve(this.baseResultsPath)}`);
   }
 
   private ensureDirectoryExists(dirPath: string): void {
@@ -74,7 +74,7 @@ export class TestResultsHandler {
     } = {}
   ): Promise<string> {
     try {
-      console.log(`💾 Saving result for: ${testName} (${status})`);
+    //   console.log(`💾 Saving result for: ${testName} (${status})`);
       
       const suiteName = this.extractTestSuite(testName);
       const sanitizedName = this.sanitizeTestName(testName);
@@ -103,7 +103,7 @@ export class TestResultsHandler {
         } else {
           fs.writeFileSync(screenshotPath, options.screenshot);
         }
-        console.log(`📸 Screenshot saved: ${screenshotPath}`);
+        // console.log(`📸 Screenshot saved: ${screenshotPath}`);
       }
       
       // Create test result object
@@ -137,11 +137,11 @@ export class TestResultsHandler {
       // Update suite summary
       this.updateSuiteSummary(suiteName, testResult);
       
-      console.log(`✅ Test result saved to: ${resultPath}`);
+    //   console.log(`✅ Test result saved to: ${resultPath}`);
       return executionFolder;
       
     } catch (error) {
-      console.error('❌ Error in saveTestCaseResult:', error);
+    //   console.error('❌ Error in saveTestCaseResult:', error);
       throw error;
     }
   }
