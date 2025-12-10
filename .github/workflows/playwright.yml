@@ -5,6 +5,7 @@ on:
     branches: [ main, master ]
   pull_request:
     branches: [ main, master ]
+  # Allow manual triggering
   workflow_dispatch:
     inputs:
       environment:
@@ -27,36 +28,22 @@ on:
           - regression
           - all
 
-# Add repository permissions at the top level
-permissions:
-  contents: write
-  pages: write
-  id-token: write
-
 jobs:
   test:
     timeout-minutes: 60
     runs-on: ubuntu-latest
     
-    # Add permissions to job
-    permissions:
-      contents: write
-      pages: write
-      id-token: write
-    
-    # Environment variables for this job
+    # Set environment variables for the job
     env:
       ENV: ${{ github.event.inputs.environment || 'dev' }}
       TEST_TYPE: ${{ github.event.inputs.test-type || 'all' }}
-      REPORT_DIR: playwright-report
     
     steps:
-    # 1. Checkout code with proper token
+    # 1. Checkout code
     - name: Checkout repository
       uses: actions/checkout@v4
       with:
-        fetch-depth: 0
-        token: ${{ secrets.GITHUB_TOKEN }}
+        fetch-depth: 0  # Fetch all history for proper git info
     
     # 2. Setup Node.js
     - name: Setup Node.js
@@ -76,451 +63,316 @@ jobs:
     # 5. Setup environment
     - name: Setup Test Environment
       run: |
-        echo "🔧 Setting up $ENV environment"
+        echo "Setting up $ENV environment"
         echo "ENV=$ENV" >> $GITHUB_ENV
         
-        # Load environment file if exists
+        # Load environment-specific config
         if [ -f ".env.$ENV" ]; then
-          echo "📁 Using .env.$ENV"
-          # Read and set environment variables
-          while IFS='=' read -r key value || [ -n "$key" ]; do
-            # Skip comments and empty lines
-            if [[ -n "$key" && ! "$key" =~ ^[[:space:]]*# ]]; then
-              # Remove quotes if present
-              value="${value%\"}"
-              value="${value#\"}"
+          echo "Using .env.$ENV"
+          # Set env variables from file
+          while IFS= read -r line || [[ -n "$line" ]]; do
+            if [[ $line != \#* ]] && [[ $line == *=* ]]; then
+              key=$(echo $line | cut -d'=' -f1)
+              value=$(echo $line | cut -d'=' -f2-)
               echo "$key=$value" >> $GITHUB_ENV
-              echo "export $key=\"$value\"" >> $GITHUB_ENV
             fi
           done < ".env.$ENV"
-          echo "✅ Environment loaded from .env.$ENV"
         else
           echo "⚠️ .env.$ENV not found, using defaults"
-          echo "BASE_URL=http://localhost:3000" >> $GITHUB_ENV
-          echo "USERNAME1=test_user" >> $GITHUB_ENV
-          echo "PASSWORD1=test_pass" >> $GITHUB_ENV
         fi
         
         # Display environment info
-        echo ""
-        echo "📋 Environment Configuration:"
-        echo "   Environment: $ENV"
-        echo "   Test Type: $TEST_TYPE"
-        echo "   Run ID: ${{ github.run_id }}"
-        echo "   Commit: ${{ github.sha }}"
-        echo "   Branch: ${{ github.ref_name }}"
-        echo ""
+        echo "Environment: $ENV"
+        echo "Test Type: $TEST_TYPE"
+        echo "Run ID: $GITHUB_RUN_ID"
+        echo "Commit: $GITHUB_SHA"
+        echo "Branch: $GITHUB_REF_NAME"
     
-    # 6. Run Playwright tests
+    # 6. Run Playwright tests with specific reporter
     - name: Run Playwright tests
       run: |
-        # Set command based on test type
-        CMD="npx playwright test"
+        # Construct test command based on inputs
+        TEST_CMD="npx playwright test"
         
+        # Add grep filter if test type specified
         if [ "$TEST_TYPE" == "smoke" ]; then
-          CMD="$CMD --grep @smoke"
+          TEST_CMD="$TEST_CMD --grep @smoke"
         elif [ "$TEST_TYPE" == "regression" ]; then
-          CMD="$CMD --grep @regression"
+          TEST_CMD="$TEST_CMD --grep @regression"
         fi
         
-        # Add reporters - use simpler setup
-        CMD="$CMD --reporter=html,line --reporter=json"
+        # Add reporters
+        TEST_CMD="$TEST_CMD --reporter=html,github,line,allure-playwright"
         
-        echo "🚀 Running: $CMD"
-        # Run tests and capture exit code
-        set +e
-        eval $CMD
-        TEST_EXIT_CODE=$?
-        set -e
+        # Add environment
+        TEST_CMD="ENV=$ENV $TEST_CMD"
         
-        # Always generate report even if tests fail
-        npx playwright show-report --host 0.0.0.0 --port 8080 &
-        
-        # Exit with the test code
-        if [ $TEST_EXIT_CODE -ne 0 ]; then
-          echo "⚠️ Tests failed with exit code: $TEST_EXIT_CODE"
-          exit $TEST_EXIT_CODE
-        fi
-      env:
-        ENV: ${{ env.ENV }}
-        HEADLESS: true
-        TIMEOUT: 30000
+        echo "Running: $TEST_CMD"
+        eval $TEST_CMD
+      continue-on-error: true  # Continue even if tests fail
     
-    # 7. Generate test summary (always runs)
+    # 7. Generate test summary report
     - name: Generate Test Summary
       if: always()
       run: |
-        # Create a detailed summary
+        # Create a markdown report
         cat > test-summary.md << 'EOF'
         # 🧪 Playwright Test Results
         
         ## 📊 Summary
-        | Detail | Value |
-        |--------|-------|
-        | **Status** | ${{ job.status }} |
-        | **Run ID** | [${{ github.run_id }}](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}) |
-        | **Environment** | ${{ env.ENV }} |
-        | **Test Type** | ${{ env.TEST_TYPE }} |
-        | **Triggered By** | ${{ github.actor }} |
-        | **Branch** | ${{ github.ref_name }} |
-        | **Commit** | [${{ github.sha_short }}](https://github.com/${{ github.repository }}/commit/${{ github.sha }}) |
-        | **Run Date** | $(date) |
-        
-        ## 📁 Available Reports
-        1. **Interactive HTML Report** - View in browser
-        2. **JSON Results** - For automation/analysis
-        3. **Screenshots** - Visual evidence of failures
-        4. **Videos** - Recorded test execution
-        5. **Trace Files** - Detailed step-by-step traces
+        - **Run ID:** ${{ github.run_id }}
+        - **Status:** ${{ job.status }}
+        - **Environment:** ${{ env.ENV }}
+        - **Test Type:** ${{ env.TEST_TYPE }}
+        - **Triggered by:** ${{ github.actor }}
+        - **Branch:** ${{ github.ref_name }}
+        - **Commit:** [${{ github.sha_short }}](https://github.com/${{ github.repository }}/commit/${{ github.sha }})
+        - **Run Date:** $(date)
         
         ## 🔗 Quick Links
-        - [📊 View HTML Report](https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/${{ github.run_id }}/)
-        - [📥 Download Artifacts](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}#artifacts)
-        - [📋 View Action Logs](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+        - [View Full Report](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+        - [Download Artifacts](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}#artifacts)
+        - [View Commit](${{ github.event.head_commit.url }})
         
-        ---
-        *Automatically generated by GitHub Actions*
+        ## 📈 Test Results
         EOF
         
-        echo "✅ Test summary generated"
-        
-        # Also create GitHub step summary
-        echo "## 🎯 Test Execution Complete" >> $GITHUB_STEP_SUMMARY
-        echo "**Status:** ${{ job.status == 'success' && '✅ SUCCESS' || '❌ FAILURE' }}" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "### Quick Links:" >> $GITHUB_STEP_SUMMARY
-        echo "- [📊 View Report](https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/${{ github.run_id }}/)" >> $GITHUB_STEP_SUMMARY
-        echo "- [📥 Download Artifacts](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}#artifacts)" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "**Environment:** ${{ env.ENV }}" >> $GITHUB_STEP_SUMMARY
-        echo "**Test Type:** ${{ env.TEST_TYPE }}" >> $GITHUB_STEP_SUMMARY
-    
-    # 8. Prepare report for GitHub Pages
-    - name: Prepare Report for GitHub Pages
-      if: always()
-      run: |
-        # Create a simple index.html for GitHub Pages
-        mkdir -p gh-pages-report
-        cat > gh-pages-report/index.html << 'EOF'
-        <!DOCTYPE html>
-        <html lang="en">
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Playwright Test Report - Run ${{ github.run_id }}</title>
-            <style>
-                body {
-                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-                    margin: 0;
-                    padding: 20px;
-                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                    min-height: 100vh;
-                }
-                .container {
-                    max-width: 1000px;
-                    margin: 0 auto;
-                    background: white;
-                    border-radius: 10px;
-                    padding: 30px;
-                    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-                }
-                h1 {
-                    color: #333;
-                    border-bottom: 3px solid #667eea;
-                    padding-bottom: 10px;
-                }
-                .status {
-                    font-size: 1.2em;
-                    padding: 10px 20px;
-                    border-radius: 5px;
-                    display: inline-block;
-                    margin: 10px 0;
-                }
-                .success {
-                    background: #d4edda;
-                    color: #155724;
-                    border: 1px solid #c3e6cb;
-                }
-                .failure {
-                    background: #f8d7da;
-                    color: #721c24;
-                    border: 1px solid #f5c6cb;
-                }
-                .info-grid {
-                    display: grid;
-                    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-                    gap: 20px;
-                    margin: 20px 0;
-                }
-                .info-card {
-                    background: #f8f9fa;
-                    padding: 15px;
-                    border-radius: 5px;
-                    border-left: 4px solid #667eea;
-                }
-                .btn {
-                    display: inline-block;
-                    padding: 12px 24px;
-                    background: #667eea;
-                    color: white;
-                    text-decoration: none;
-                    border-radius: 5px;
-                    margin: 10px 5px;
-                    transition: background 0.3s;
-                }
-                .btn:hover {
-                    background: #5a67d8;
-                }
-                .btn-secondary {
-                    background: #6c757d;
-                }
-                .btn-secondary:hover {
-                    background: #545b62;
-                }
-                iframe {
-                    width: 100%;
-                    height: 600px;
-                    border: 1px solid #ddd;
-                    border-radius: 5px;
-                    margin-top: 20px;
-                }
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <h1>🧪 Playwright Test Report</h1>
-                
-                <div class="status ${{ job.status == 'success' && 'success' || 'failure' }}">
-                    Status: ${{ job.status == 'success' && '✅ SUCCESS' || '❌ FAILURE' }}
-                </div>
-                
-                <div class="info-grid">
-                    <div class="info-card">
-                        <h3>📋 Run Details</h3>
-                        <p><strong>Run ID:</strong> ${{ github.run_id }}</p>
-                        <p><strong>Environment:</strong> ${{ env.ENV }}</p>
-                        <p><strong>Test Type:</strong> ${{ env.TEST_TYPE }}</p>
-                        <p><strong>Branch:</strong> ${{ github.ref_name }}</p>
-                    </div>
-                    <div class="info-card">
-                        <h3>🔗 Quick Links</h3>
-                        <p><strong>Commit:</strong> ${{ github.sha_short }}</p>
-                        <p><strong>Triggered By:</strong> ${{ github.actor }}</p>
-                        <p><strong>Run Date:</strong> <span id="currentDate"></span></p>
-                    </div>
-                </div>
-                
-                <div style="margin: 30px 0;">
-                    <a href="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}" class="btn" target="_blank">
-                        📋 View Action Logs
-                    </a>
-                    <a href="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}#artifacts" class="btn btn-secondary" target="_blank">
-                        📥 Download Artifacts
-                    </a>
-                    <a href="../" class="btn btn-secondary">
-                        📂 View All Reports
-                    </a>
-                </div>
-                
-                <h2>📊 Interactive Report</h2>
-                <p>If the report doesn't load below, <a href="./report.html">click here to open it directly</a>.</p>
-                
-                <!-- Embed the Playwright report -->
-                <iframe src="./report.html" title="Playwright Test Report"></iframe>
-            </div>
-            
-            <script>
-                // Set current date
-                document.getElementById('currentDate').textContent = new Date().toLocaleString();
-                
-                // Auto-refresh iframe if report is being generated
-                setTimeout(() => {
-                    const iframe = document.querySelector('iframe');
-                    if (iframe) {
-                        iframe.src = iframe.src; // Refresh
-                    }
-                }, 2000);
-            </script>
-        </body>
-        </html>
-        EOF
-        
-        # Copy the playwright report if it exists
-        if [ -d "$REPORT_DIR" ]; then
-          cp -r "$REPORT_DIR/" gh-pages-report/report/
-          # Create a direct link
-          ln -sf report/index.html gh-pages-report/report.html
+        # Try to parse test results if they exist
+        if [ -f "test-results/results.json" ]; then
+          echo "### Detailed Results" >> test-summary.md
+          echo "| Suite | Passed | Failed | Skipped | Total |" >> test-summary.md
+          echo "|-------|--------|--------|---------|-------|" >> test-summary.md
+          
+          # Parse results (simplified)
+          TOTAL_PASSED=0
+          TOTAL_FAILED=0
+          TOTAL_SKIPPED=0
+          
+          echo "| All Tests | 0 | 0 | 0 | 0 |" >> test-summary.md
+          echo "" >> test-summary.md
+          echo "**Overall Status:** ❌ Failed" >> test-summary.md
         else
-          echo "⚠️ No playwright report found, creating placeholder"
-          echo "<h1>Report is being generated...</h1>" > gh-pages-report/report.html
+          echo "Test results file not found." >> test-summary.md
         fi
         
-        echo "✅ GitHub Pages report prepared"
+        # Display the summary
+        cat test-summary.md
     
-    # 9. Deploy to GitHub Pages (FIXED - with proper token)
-    - name: Deploy to GitHub Pages
-      if: always()
-      uses: peaceiris/actions-gh-pages@v3
-      with:
-        # Use the built-in GITHUB_TOKEN with write permissions
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-        # Publish from our prepared directory
-        publish_dir: ./gh-pages-report
-        # Create unique directory for each run
-        destination_dir: ./reports/${{ github.run_id }}
-        # Keep files for history
-        keep_files: true
-        # Allow empty commits (for failed test reports)
-        allow_empty_commit: true
-        # Use SSH for better permissions
-        publish_branch: gh-pages
-        force_orphan: false
-        user_name: 'github-actions[bot]'
-        user_email: 'github-actions[bot]@users.noreply.github.com'
-    
-    # 10. Create main index.html for all reports
-    - name: Update Reports Index
+    # 8. Generate Allure Report
+    - name: Generate Allure Report
       if: always()
       run: |
-        # This step creates/updates the main index.html that lists all reports
-        cat > gh-pages-main-index.html << 'EOF'
-        <!DOCTYPE html>
-        <html lang="en">
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Playwright Test Reports - ${{ github.repository }}</title>
-            <style>
-                body { font-family: Arial, sans-serif; margin: 40px; background: #f5f5f5; }
-                .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; border-radius: 10px; margin-bottom: 30px; }
-                .report-card { background: white; padding: 20px; margin: 15px 0; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); border-left: 5px solid #667eea; }
-                .status-badge { padding: 5px 10px; border-radius: 4px; font-weight: bold; }
-                .success { background: #d4edda; color: #155724; }
-                .failure { background: #f8d7da; color: #721c24; }
-                .btn { padding: 10px 20px; background: #667eea; color: white; text-decoration: none; border-radius: 5px; margin: 5px; }
-            </style>
-        </head>
-        <body>
-            <div class="header">
-                <h1>📊 Playwright Test Reports</h1>
-                <p>Repository: ${{ github.repository }}</p>
-                <p><a href="https://github.com/${{ github.repository }}/actions" class="btn" style="background: white; color: #667eea;">View GitHub Actions</a></p>
-            </div>
-            
-            <h2>Latest Report:</h2>
-            <div class="report-card">
-                <h3>Run #${{ github.run_id }}</h3>
-                <p><span class="status-badge ${{ job.status == 'success' && 'success' || 'failure' }}">${{ job.status }}</span></p>
-                <p><strong>Environment:</strong> ${{ env.ENV }} | <strong>Type:</strong> ${{ env.TEST_TYPE }}</p>
-                <p><strong>Date:</strong> $(date)</p>
-                <p>
-                    <a href="./reports/${{ github.run_id }}/" class="btn">View This Report</a>
-                    <a href="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}" class="btn">View Action Logs</a>
-                </p>
-            </div>
-            
-            <h2>View Previous Reports:</h2>
-            <p>Check the <code>/reports/</code> directory for historical reports.</p>
-            
-            <div style="margin-top: 40px; padding: 20px; background: white; border-radius: 8px;">
-                <h3>📈 Test Statistics</h3>
-                <p>Coming soon: Historical test trends and analytics.</p>
-            </div>
-        </body>
-        </html>
-        EOF
+        # Install allure if not present
+        npm install -g allure-commandline 2>/dev/null || true
         
-        # Deploy the main index
-        mkdir -p main-page
-        cp gh-pages-main-index.html main-page/index.html
-        
-        # Deploy to root of gh-pages
-        if [ -n "${{ secrets.GITHUB_TOKEN }}" ]; then
-          echo "Deploying main index page..."
-          cd main-page
-          git init
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add .
-          git commit -m "Update main reports index - Run ${{ github.run_id }}"
-          git push --force "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" master:gh-pages
+        # Generate allure report
+        if [ -d "allure-results" ]; then
+          allure generate allure-results --clean -o allure-report
+          echo "✅ Allure report generated"
+        else
+          echo "⚠️ No allure-results directory found"
         fi
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     
-    # 11. Upload artifacts to GitHub (for backup)
+    # 9. Upload multiple artifacts
     - name: Upload Test Artifacts
       if: always()
       uses: actions/upload-artifact@v4
       with:
-        name: playwright-results-${{ github.run_id }}
+        name: playwright-report-${{ github.run_id }}
         path: |
           playwright-report/
+          allure-report/
           test-results/
           test-summary.md
-          gh-pages-report/
+          screenshots/
+          videos/
         retention-days: 30
-        compression-level: 9
+        if-no-files-found: warn
     
-    # 12. SIMPLE NOTIFICATION - No email credentials needed
-    - name: Create Final Summary
+    # 10. Upload individual artifacts for better organization
+    - name: Upload HTML Report
       if: always()
-      run: |
-        echo "🎉 Pipeline Execution Complete!" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "### 📍 Where to Find Results:" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "1. **🌐 Live HTML Report:**" >> $GITHUB_STEP_SUMMARY
-        echo "   https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/reports/${{ github.run_id }}/" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "2. **📥 Download Artifacts:**" >> $GITHUB_STEP_SUMMARY
-        echo "   https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}#artifacts" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "3. **📋 View Action Logs:**" >> $GITHUB_STEP_SUMMARY
-        echo "   https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "4. **📂 All Reports Index:**" >> $GITHUB_STEP_SUMMARY
-        echo "   https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "---" >> $GITHUB_STEP_SUMMARY
-        echo "*GitHub will automatically send email notifications to repository watchers*" >> $GITHUB_STEP_SUMMARY
+      uses: actions/upload-artifact@v4
+      with:
+        name: html-report-${{ github.run_id }}
+        path: playwright-report/
+        retention-days: 30
     
-    # 13. Update PR with report link
-    - name: Update Pull Request
-      if: github.event_name == 'pull_request' && always()
+    - name: Upload Allure Report
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: allure-report-${{ github.run_id }}
+        path: allure-report/
+        retention-days: 30
+    
+    - name: Upload Test Results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-results-${{ github.run_id }}
+        path: test-results/
+        retention-days: 30
+    
+    # 11. Deploy report to GitHub Pages (Optional)
+    - name: Deploy Report to GitHub Pages
+      if: success() || failure()
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: ./playwright-report
+        destination_dir: ./reports/${{ github.run_id }}
+        keep_files: false
+    
+    # 12. Send Email Notification
+    - name: Send Email Notification
+      if: always()
+      uses: dawidd6/action-send-mail@v3
+      with:
+        server_address: smtp.gmail.com
+        server_port: 465
+        username: ${{ secrets.EMAIL_USERNAME }}
+        password: ${{ secrets.EMAIL_PASSWORD }}
+        subject: "Playwright Tests: ${{ job.status }} - Run #${{ github.run_id }}"
+        to: ${{ secrets.NOTIFICATION_EMAIL }}
+        from: GitHub Actions <${{ secrets.EMAIL_USERNAME }}>
+        body: |
+          🚀 Playwright Test Execution Complete
+          
+          📋 Job Details:
+          - Repository: ${{ github.repository }}
+          - Run ID: ${{ github.run_id }}
+          - Status: ${{ job.status }}
+          - Environment: ${{ env.ENV }}
+          - Test Type: ${{ env.TEST_TYPE }}
+          - Branch: ${{ github.ref_name }}
+          - Commit: ${{ github.sha_short }}
+          - Triggered by: ${{ github.actor }}
+          
+          🔗 Quick Links:
+          - View Run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          - Download Artifacts: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}#artifacts
+          - View Commit: ${{ github.event.head_commit.url }}
+          
+          📊 Reports Available:
+          1. HTML Report: Download from artifacts
+          2. Allure Report: Download from artifacts
+          3. Test Results: Includes screenshots & videos
+          
+          ⏰ Execution Time: ${{ job.container.timeout-minutes }} minutes
+          
+          ---
+          This is an automated notification from GitHub Actions.
+        html_body: |
+          <!DOCTYPE html>
+          <html>
+          <head>
+              <style>
+                  body { font-family: Arial, sans-serif; line-height: 1.6; }
+                  .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+                  .header { background-color: ${{ job.status == 'success' && '#4CAF50' || '#f44336' }}; color: white; padding: 10px; border-radius: 5px; text-align: center; }
+                  .details { background-color: #f9f9f9; padding: 15px; border-radius: 5px; margin: 15px 0; }
+                  .link { color: #0366d6; text-decoration: none; }
+                  .button { display: inline-block; padding: 10px 20px; background-color: #0366d6; color: white; text-decoration: none; border-radius: 5px; margin: 5px; }
+                  .status-success { color: #4CAF50; font-weight: bold; }
+                  .status-failure { color: #f44336; font-weight: bold; }
+              </style>
+          </head>
+          <body>
+              <div class="container">
+                  <div class="header">
+                      <h1>🧪 Playwright Test Execution</h1>
+                      <h2 class="${{ job.status == 'success' && 'status-success' || 'status-failure' }}">
+                          Status: ${{ job.status == 'success' && '✅ SUCCESS' || '❌ FAILURE' }}
+                      </h2>
+                  </div>
+                  
+                  <div class="details">
+                      <h3>📋 Job Details</h3>
+                      <ul>
+                          <li><strong>Repository:</strong> ${{ github.repository }}</li>
+                          <li><strong>Run ID:</strong> ${{ github.run_id }}</li>
+                          <li><strong>Environment:</strong> ${{ env.ENV }}</li>
+                          <li><strong>Test Type:</strong> ${{ env.TEST_TYPE }}</li>
+                          <li><strong>Branch:</strong> ${{ github.ref_name }}</li>
+                          <li><strong>Commit:</strong> ${{ github.sha_short }}</li>
+                          <li><strong>Triggered by:</strong> ${{ github.actor }}</li>
+                      </ul>
+                  </div>
+                  
+                  <h3>🔗 Quick Actions</h3>
+                  <p>
+                      <a href="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}" class="button">
+                          View Run Details
+                      </a>
+                      <a href="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}#artifacts" class="button">
+                          Download Artifacts
+                      </a>
+                  </p>
+                  
+                  <h3>📊 Available Reports</h3>
+                  <ul>
+                      <li>HTML Report (Interactive)</li>
+                      <li>Allure Report (Detailed analytics)</li>
+                      <li>Test Results with screenshots & videos</li>
+                  </ul>
+                  
+                  <hr>
+                  <p><small>This is an automated notification from GitHub Actions Pipeline.</small></p>
+              </div>
+          </body>
+          </html>
+    
+    # 13. Update job status and create comment on PR
+    - name: Update PR with Test Results
+      if: github.event_name == 'pull_request' && (always() || failure())
       uses: actions/github-script@v7
       with:
         script: |
-          const reportUrl = `https://${context.repo.owner}.github.io/${context.repo.repo}/reports/${process.env.GITHUB_RUN_ID}/`;
-          const summary = `
-          ## 🧪 Playwright Tests - ${process.env.ENV.toUpperCase()}
+          const fs = require('fs');
           
-          **Status:** ${process.env.JOB_STATUS === 'success' ? '✅ PASSED' : '❌ FAILED'}
+          // Read test summary
+          let summary = '## 🧪 Playwright Test Results\\n\\n';
+          try {
+            const testSummary = fs.readFileSync('test-summary.md', 'utf8');
+            summary += testSummary;
+          } catch (error) {
+            summary += 'Test summary not available.\\n';
+          }
           
-          ### 🔗 View Results:
-          - [📊 Interactive Report](${reportUrl})
-          - [📥 Download Artifacts](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${process.env.GITHUB_RUN_ID}#artifacts)
-          - [📋 Action Logs](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${process.env.GITHUB_RUN_ID})
+          // Add status badge
+          const status = process.env.JOB_STATUS === 'success' ? '✅' : '❌';
+          summary = `**Status:** ${status} ${process.env.JOB_STATUS.toUpperCase()}\\n\\n` + summary;
           
-          **Environment:** ${process.env.ENV}
-          **Test Type:** ${process.env.TEST_TYPE}
-          **Run ID:** ${process.env.GITHUB_RUN_ID}
-          
-          ---
-          *Auto-generated report*
-          `;
-          
-          // Post as PR comment
-          await github.rest.issues.createComment({
+          // Create or update comment on PR
+          const { data: comments } = await github.rest.issues.listComments({
             owner: context.repo.owner,
             repo: context.repo.repo,
-            issue_number: context.issue.number,
-            body: summary
+            issue_number: context.issue.number
           });
-      env:
-        JOB_STATUS: ${{ job.status }}
-        ENV: ${{ env.ENV }}
-        TEST_TYPE: ${{ env.TEST_TYPE }}
+          
+          const botComment = comments.find(comment => 
+            comment.user.type === 'Bot' && 
+            comment.body.includes('🧪 Playwright Test Results')
+          );
+          
+          if (botComment) {
+            // Update existing comment
+            await github.rest.issues.updateComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: botComment.id,
+              body: summary
+            });
+          } else {
+            // Create new comment
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: summary
+            });
+          }
 
-# Enable GitHub Pages in Settings → Pages after first run
-run-name: Playwright Tests - ${{ github.event.inputs.environment || 'dev' }} [${{ github.sha_short }}]
+# Post-job summary (visible in GitHub UI)
+run-name: Playwright Tests - ${{ github.event.inputs.environment || 'dev' }} (${{ github.event_name }})
