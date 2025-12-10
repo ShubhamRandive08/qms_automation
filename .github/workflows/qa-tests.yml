@@ -47,7 +47,7 @@ jobs:
           # QA ENVIRONMENT DEFAULTS
           # ===========================================
           ENV=qa
-          BASE_URL=https://qa.your-application.com
+          BASE_URL=https://opensource-demo.orangehrmlive.com
           USERNAME=Admin
           PASSWORD=admin123
           HEADLESS=true
@@ -76,92 +76,12 @@ jobs:
         run: npm run test:qa
         env:
           # Pass environment variables directly
+          BASE_URL : https://opensource-demo.orangehrmlive.com
           ENV: qa
           HEADLESS: true
           TIMEOUT: 30000
       
-      # 7. Generate HTML Report (no upload needed)
-      - name: Generate Report
-        if: always()
-        run: |
-          # Create simple HTML report
-          echo "📊 Generating test report..."
-          
-          # Check if playwright-report exists
-          if [ -d "playwright-report" ]; then
-            echo "✅ Playwright report found"
-            npx playwright show-report playwright-report --host 0.0.0.0 --port 8080 &
-          else
-            echo "⚠️ No playwright report found, creating simple report"
-            mkdir -p playwright-report
-            cat > playwright-report/index.html << 'EOF'
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <title>QA Test Report - Run ${{ github.run_id }}</title>
-                <style>
-                    body { font-family: Arial, sans-serif; padding: 40px; }
-                    .header { background: #0366d6; color: white; padding: 20px; border-radius: 5px; }
-                    .info { background: #f8f9fa; padding: 15px; border-radius: 5px; margin: 10px 0; }
-                </style>
-            </head>
-            <body>
-                <div class="header">
-                    <h1>🧪 QA Test Report</h1>
-                    <p>Default QA Environment Tests</p>
-                </div>
-                <div class="info">
-                    <h3>Test Run Details</h3>
-                    <p><strong>Run ID:</strong> ${{ github.run_id }}</p>
-                    <p><strong>Environment:</strong> qa (default)</p>
-                    <p><strong>Date:</strong> $(date)</p>
-                    <p><strong>Commit:</strong> ${{ github.sha }}</p>
-                    <p><strong>Status:</strong> Tests executed with default QA configuration</p>
-                </div>
-                <p>Check GitHub Actions logs for detailed results.</p>
-                <p><a href="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}">View Action Logs</a></p>
-            </body>
-            </html>
-            EOF
-          fi
-          
-          # Create a simple summary file
-          echo "📝 Creating test summary..."
-          cat > test-summary.md << 'EOF'
-          # QA Test Run - ${{ github.run_id }}
-          
-          ## Summary
-          - **Date:** $(date)
-          - **Status:** ${{ job.status }}
-          - **Environment:** qa (default configuration)
-          - **Commit:** ${{ github.sha }}
-          - **Branch:** ${{ github.ref_name }}
-          - **Triggered by:** ${{ github.actor }}
-          
-          ## Configuration Used
-          - **ENV:** qa
-          - **BASE_URL:** https://qa.your-application.com
-          - **USERNAME:** qa_test_user
-          - **PASSWORD:** ********
-          - **HEADLESS:** true
-          - **TIMEOUT:** 30000ms
-          
-          ## Notes
-          This run used DEFAULT QA environment configuration since .env.qa file was not provided.
-          
-          To use custom configuration:
-          1. Create `.env.qa` file in repository root
-          2. Add your QA environment variables
-          3. Re-run the workflow
-          
-          ## Links
-          - [View Action Logs](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
-          - [Download Artifacts](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}#artifacts)
-          EOF
-          
-          echo "✅ Report generation complete"
-      
-      # 8. Upload Test Results (optional - for debugging)
+      # 7. Upload Test Results (optional - for debugging)
       - name: Upload Results
         if: always()
         uses: actions/upload-artifact@v4
