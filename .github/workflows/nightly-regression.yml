@@ -32,3 +32,8 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./allure-report
           destination_dir: ./nightly/$(date +%Y-%m-%d)
+
+      - name: Push to gh-pages
+        run: git push origin gh-pages
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

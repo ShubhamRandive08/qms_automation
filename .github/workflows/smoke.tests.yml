@@ -21,9 +21,9 @@ jobs:
           # Run only critical tests tagged @smoke
           npx playwright test --grep @smoke --reporter=github,line
       
-      - name: Report to Slack
-        if: always()
-        uses: 8398a7/action-slack@v3
-        with:
-          status: ${{ job.status }}
-          text: "Smoke tests: ${{ job.status }}"
+    #   - name: Report to Slack
+    #     if: always()
+    #     uses: 8398a7/action-slack@v3
+    #     with:
+    #       status: ${{ job.status }}
+    #       text: "Smoke tests: ${{ job.status }}"
