@@ -23,7 +23,7 @@ export interface EnvironmentConfig {
 }
 
 export const config: EnvironmentConfig = {
-  BASE_URL: process.env.BASE_URL! || 'https://opensourc-demo.orangehrmlive.com' ,
+  BASE_URL: process.env.BASE_URL! || 'https://opensource-demo.orangehrmlive.com' ,
   USERNAME1: process.env.USERNAME1! || 'Admin',
   PASSWORD1: process.env.PASSWORD1! || 'admin123',
   ENV: process.env.ENV! || 'QA',
