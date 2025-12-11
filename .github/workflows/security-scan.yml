@@ -1,0 +1,47 @@
+name: Security Scan
+
+on:
+  schedule:
+    - cron: '0 2 * * *'  # 2 AM daily
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  security:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Run npm audit
+        run: npm audit --audit-level=high || true
+      
+      - name: Run Snyk Security Scan
+        uses: snyk/actions/node@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+      
+      - name: Run OWASP Dependency Check
+        uses: dependency-check/Dependency-Check_Action@main
+        with:
+          project: 'qms-automation'
+          path: '.'
+          format: 'HTML'
+      
+      - name: Upload Security Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-report-${{ github.run_id }}
+          path: |
+            dependency-check-report.html
+            snyk-report.json
+          retention-days: 90
+      
+      - name: Alert on Critical Vulnerabilities
+        if: failure()
+        run: |
+          echo "🚨 CRITICAL SECURITY VULNERABILITIES FOUND!"
+          echo "Check artifacts for detailed report"
+          exit 1

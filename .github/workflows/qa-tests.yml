@@ -36,7 +36,7 @@ jobs:
       - name: Install Playwright
         run: npx playwright install --with-deps chromium
       
-      # 5. ✅ UPDATED: Setup QA environment (DEFAULT SETUP - no .env.qa needed)
+      # 5. UPDATED: Setup QA environment (DEFAULT SETUP - no .env.qa needed)
       - name: Setup QA Environment
         run: |
           echo "🔧 Setting up QA Environment with DEFAULTS"

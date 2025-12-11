@@ -1,0 +1,34 @@
+name: Nightly Regression
+
+on:
+  schedule:
+    - cron: '0 3 * * *'  # 3 AM daily
+  workflow_dispatch:
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180  # 3 hours
+    
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+      
+      - name: Run Full Regression
+        run: |
+          npm ci
+          npx playwright install --with-deps
+          # Run all tests except @smoke
+          npx playwright test --grep-invert @smoke --reporter=html,line,json
+      
+      - name: Generate Allure Report
+        run: |
+          npm install -g allure-commandline
+          allure generate allure-results --clean -o allure-report
+      
+      - name: Deploy Report
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./allure-report
+          destination_dir: ./nightly/$(date +%Y-%m-%d)

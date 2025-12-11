@@ -1,0 +1,76 @@
+name: On-Demand Full Test Suite
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Test Environment'
+        required: true
+        default: 'qa'
+        type: choice
+        options: ['dev', 'qa', 'staging', 'prod']
+      browsers:
+        description: 'Browsers to test'
+        required: false
+        default: 'chromium,firefox'
+        type: string
+      test-groups:
+        description: 'Test groups to run'
+        required: false
+        default: 'all'
+        type: choice
+        options: ['all', 'e2e', 'api', 'ui', 'critical']
+
+jobs:
+  full-suite:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240  # 4 hours
+    
+    strategy:
+      matrix:
+        browser: ${{ fromJson(format('[{0}]', inputs.browsers)) }}
+    
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+      
+      - name: Setup Environment
+        run: |
+          echo "Testing on: ${{ github.event.inputs.environment }}"
+          echo "Browsers: ${{ github.event.inputs.browsers }}"
+          echo "Test groups: ${{ github.event.inputs.test-groups }}"
+          
+          # Load environment config
+          cp .env.${{ github.event.inputs.environment }} .env || cp .env.example .env
+      
+      - name: Run Comprehensive Tests
+        run: |
+          npm ci
+          npx playwright install --with-deps
+          
+          # Build test command based on inputs
+          CMD="npx playwright test"
+          
+          if [ "${{ github.event.inputs.test-groups }}" != "all" ]; then
+            CMD="$CMD tests/${{ github.event.inputs.test-groups }}/"
+          fi
+          
+          # Run with all reporters
+          $CMD \
+            --project=${{ matrix.browser }} \
+            --reporter=html,line,json,junit,allure-playwright \
+            --workers=2
+      
+      - name: Generate Consolidated Report
+        run: |
+          # Merge reports from all browsers
+          npm run report:merge
+      
+      - name: Deploy Interactive Dashboard
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./consolidated-report
+          destination_dir: ./full-suite/${{ github.run_id }}
+      
+     

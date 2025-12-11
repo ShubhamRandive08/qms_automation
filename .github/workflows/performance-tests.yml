@@ -1,0 +1,77 @@
+name: Performance Tests
+
+on:
+  schedule:
+    - cron: '0 4 * * 0'  # Every Sunday 4 AM
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment'
+        required: true
+        default: 'prod'
+        type: choice
+        options: ['staging', 'prod']
+
+jobs:
+  performance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    
+    env:
+      TARGET_ENV: ${{ github.event.inputs.environment || 'staging' }}
+    
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+      
+      - name: Run Performance Tests
+        run: |
+          npm ci
+          # Install Playwright with performance monitoring
+          npx playwright install --with-deps chromium
+          
+          # Run tests with performance metrics
+          npx playwright test tests/performance/ \
+            --reporter=json,line \
+            --grep @performance \
+            --project=chromium \
+            --repeat-each=3  # Run 3 times for averages
+      
+      - name: Generate Performance Report
+        run: |
+          # Analyze test durations
+          node scripts/analyze-performance.js
+          
+          # Create performance dashboard
+          mkdir -p performance-report
+          cat > performance-report/index.html << 'EOF'
+          <!DOCTYPE html>
+          <html>
+          <head><title>Performance Report</title></head>
+          <body>
+              <h1>🚀 Performance Metrics</h1>
+              <div id="charts"></div>
+          </body>
+          </html>
+          EOF
+      
+      - name: Compare with Baseline
+        run: |
+          # Compare with previous runs
+          npm run performance:compare
+      
+      - name: Upload Performance Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: performance-${{ github.run_id }}
+          path: |
+            performance-report/
+            test-results/
+            performance-metrics.json
+          retention-days: 30
+      
+      - name: Alert on Performance Degradation
+        if: failure()
+        run: |
+          echo "📉 PERFORMANCE DEGRADATION DETECTED!"
+          echo "Some tests exceeded performance thresholds"

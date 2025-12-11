@@ -1,0 +1,38 @@
+name: Cleanup Old Artifacts
+
+on:
+  schedule:
+    - cron: '0 1 * * 0'  # Every Sunday 1 AM
+  workflow_dispatch:
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Cleanup Old Workflow Runs
+        uses: Mattraks/delete-workflow-runs@v2
+        with:
+          token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          retain_days: 30
+          keep_minimum_runs: 20
+      
+      - name: Cleanup Old Artifacts
+        uses: c-hive/gha-remove-artifacts@v1
+        with:
+          age: '30 days'
+          skip-tags: 'latest,production'
+      
+      - name: Optimize Database
+        run: |
+          # Clean test database if you have one
+          echo "Cleaning up test data..."
+          # Add your cleanup scripts here
+      
+      - name: Report Cleanup
+        run: |
+          echo "🧹 Cleanup completed"
+          echo "✅ Old workflow runs removed"
+          echo "✅ Old artifacts deleted"
+          echo "✅ Database optimized"

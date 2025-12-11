@@ -1,0 +1,29 @@
+name: Smoke Tests
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'  # Every 30 minutes
+  workflow_dispatch:         # Manual trigger
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+      
+      - name: Run Smoke Tests
+        run: |
+          npm ci
+          npx playwright install chromium
+          # Run only critical tests tagged @smoke
+          npx playwright test --grep @smoke --reporter=github,line
+      
+      - name: Report to Slack
+        if: always()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          text: "Smoke tests: ${{ job.status }}"

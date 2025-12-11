@@ -32,9 +32,9 @@ export const config: EnvironmentConfig = {
 };
 
 // Log loaded config (without password)
-console.log('🔧 Environment Configuration:');
-console.log(`   Environment: ${config.ENV}`);
-console.log(`   Base URL: ${config.BASE_URL}`);
-console.log(`   Username: ${config.USERNAME1}`);
-console.log(`   Headless: ${config.HEADLESS}`);
-console.log(`   Timeout: ${config.TIMEOUT}ms`);
+// console.log('🔧 Environment Configuration:');
+// console.log(`   Environment: ${config.ENV}`);
+// console.log(`   Base URL: ${config.BASE_URL}`);
+// console.log(`   Username: ${config.USERNAME1}`);
+// console.log(`   Headless: ${config.HEADLESS}`);
+// console.log(`   Timeout: ${config.TIMEOUT}ms`);
