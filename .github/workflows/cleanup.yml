@@ -32,7 +32,7 @@ jobs:
       
       - name: Report Cleanup
         run: |
-          echo "🧹 Cleanup completed"
-          echo "✅ Old workflow runs removed"
-          echo "✅ Old artifacts deleted"
-          echo "✅ Database optimized"
+          echo " Cleanup completed"
+          echo " Old workflow runs removed"
+          echo " Old artifacts deleted"
+          echo " Database optimized"

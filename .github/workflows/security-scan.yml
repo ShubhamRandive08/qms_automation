@@ -42,6 +42,6 @@ jobs:
       - name: Alert on Critical Vulnerabilities
         if: failure()
         run: |
-          echo "🚨 CRITICAL SECURITY VULNERABILITIES FOUND!"
+          echo "CRITICAL SECURITY VULNERABILITIES FOUND!"
           echo "Check artifacts for detailed report"
           exit 1
