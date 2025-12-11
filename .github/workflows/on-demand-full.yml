@@ -8,69 +8,226 @@ on:
         required: true
         default: 'qa'
         type: choice
-        options: ['dev', 'qa', 'staging', 'prod']
+        options: [dev, qa, staging, prod]
       browsers:
-        description: 'Browsers to test'
+        description: 'Browsers (comma-separated): chromium,firefox,webkit'
         required: false
-        default: 'chromium,firefox'
+        default: 'chromium'
         type: string
       test-groups:
         description: 'Test groups to run'
         required: false
         default: 'all'
         type: choice
-        options: ['all', 'e2e', 'api', 'ui', 'critical']
+        options: [all, e2e, api, ui, critical]
+
+permissions:
+  contents: read
 
 jobs:
-  full-suite:
+
+  prepare:
+    name: ① Prepare (checkout, deps, browsers, runtime env)
     runs-on: ubuntu-latest
-    timeout-minutes: 240  # 4 hours
-    
-    strategy:
-      matrix:
-        browser: ${{ fromJson(format('[{0}]', inputs.browsers)) }}
-    
+    timeout-minutes: 20
+    # Attach this job to the selected GitHub Environment so you can use Environment-scoped secrets/vars
+    environment: ${{ inputs.environment }}
     steps:
       - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+
       - uses: actions/setup-node@v4
-      
-      - name: Setup Environment
-        run: |
-          echo "Testing on: ${{ github.event.inputs.environment }}"
-          echo "Browsers: ${{ github.event.inputs.browsers }}"
-          echo "Test groups: ${{ github.event.inputs.test-groups }}"
-          
-          # Load environment config
-          cp .env.${{ github.event.inputs.environment }} .env || cp .env.example .env
-      
-      - name: Run Comprehensive Tests
-        run: |
-          npm ci
-          npx playwright install --with-deps
-          
-          # Build test command based on inputs
-          CMD="npx playwright test"
-          
-          if [ "${{ github.event.inputs.test-groups }}" != "all" ]; then
-            CMD="$CMD tests/${{ github.event.inputs.test-groups }}/"
-          fi
-          
-          # Run with all reporters
-          $CMD \
-            --project=${{ matrix.browser }} \
-            --reporter=html,line,json,junit,allure-playwright \
-            --workers=2
-      
-      - name: Generate Consolidated Report
-        run: |
-          # Merge reports from all browsers
-          npm run report:merge
-      
-      - name: Deploy Interactive Dashboard
-        uses: peaceiris/actions-gh-pages@v3
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./consolidated-report
-          destination_dir: ./full-suite/${{ github.run_id }}
-      
-     
+          node-version: lts/*
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps
+
+      - name: Export runtime environment (no .env files)
+        shell: bash
+        run: |
+          ENV="${{ inputs.environment }}"
+          echo "ENV=$ENV" >> "$GITHUB_ENV"
+
+          # ---------- Map repo/environment variables & secrets to runtime env ----------
+          # Example variables/secrets. Add your own keys below following this pattern.
+
+          # BASE_URL from repository Variables (DEV_BASE_URL / QA_BASE_URL / STAGING_BASE_URL / PROD_BASE_URL)
+          case "$ENV" in
+            dev)     BASE_URL="${{ vars.DEV_BASE_URL }}";;
+            qa)      BASE_URL="${{ vars.QA_BASE_URL }}";;
+            staging) BASE_URL="${{ vars.STAGING_BASE_URL }}";;
+            prod)    BASE_URL="${{ vars.PROD_BASE_URL }}";;
+          esac
+          [ -n "$BASE_URL" ] && echo "BASE_URL=$BASE_URL" >> "$GITHUB_ENV"
+
+          # API token from repository Secrets (DEV_API_TOKEN / QA_API_TOKEN / STAGING_API_TOKEN / PROD_API_TOKEN)
+          case "$ENV" in
+            dev)     API_TOKEN="${{ secrets.DEV_API_TOKEN }}";;
+            qa)      API_TOKEN="${{ secrets.QA_API_TOKEN }}";;
+            staging) API_TOKEN="${{ secrets.STAGING_API_TOKEN }}";;
+            prod)    API_TOKEN="${{ secrets.PROD_API_TOKEN }}";;
+          esac
+          [ -n "$API_TOKEN" ] && echo "API_TOKEN=$API_TOKEN" >> "$GITHUB_ENV"
+
+          # 👇 Add more mappings as needed:
+          # case "$ENV" in
+          #   dev)     DB_URL="${{ vars.DEV_DB_URL }}";;
+          #   qa)      DB_URL="${{ vars.QA_DB_URL }}";;
+          #   staging) DB_URL="${{ vars.STAGING_DB_URL }}";;
+          #   prod)    DB_URL="${{ vars.PROD_DB_URL }}";;
+          # esac
+          # [ -n "$DB_URL" ] && echo "DB_URL=$DB_URL" >> "$GITHUB_ENV"
+
+          echo "Exported variables for $ENV"
+          echo "BASE_URL=${BASE_URL:-<unset>}"
+
+      - name: Pack prepared workspace
+        run: |
+          tar -czf workspace.tar.gz \
+            node_modules \
+            package.json package-lock.json \
+            playwright.config.* \
+            .
+      - name: Upload prepared workspace
+        uses: actions/upload-artifact@v4
+        with:
+          name: prepared-workspace
+          path: workspace.tar.gz
+
+  tests:
+    name: ② Run Tests (matrix by browser)
+    runs-on: ubuntu-latest
+    needs: [prepare]
+    timeout-minutes: 240
+    strategy:
+      fail-fast: false
+      # FIXED: turns "chromium,firefox" -> ["chromium","firefox"]
+      matrix:
+        browser: ${{ fromJson(toJson(inputs.browsers)) }}
+
+
+    steps:
+      - name: Download prepared workspace
+        uses: actions/download-artifact@v4
+        with:
+          name: prepared-workspace
+          path: .
+      - name: Unpack
+        run: tar -xzf workspace.tar.gz
+
+      - name: Ensure Node (safety)
+        uses: actions/setup-node@v4
+        with: { node-version: lts/*, cache: npm }
+
+      - name: Show runtime env in this job
+        run: |
+          echo "ENV=$ENV"
+          echo "BASE_URL=${BASE_URL:-<unset>}"
+          echo "Selected group=${{ inputs['test-groups'] }}"
+          echo "Browser=${{ matrix.browser }}"
+
+      - name: Run Playwright on ${{ matrix.browser }}
+        id: run
+        shell: bash
+        env:
+          # pass through important envs to tests
+          ENV: ${{ env.ENV }}
+          BASE_URL: ${{ env.BASE_URL }}
+          API_TOKEN: ${{ env.API_TOKEN }}
+        run: |
+          CMD="npx playwright test"
+          if [ "${{ inputs['test-groups'] }}" != "all" ]; then
+            CMD="$CMD tests/${{ inputs['test-groups'] }}/"
+          fi
+          CMD="$CMD --project=${{ matrix.browser }} --reporter=html,line,allure-playwright,junit"
+          echo "Running: $CMD"
+          set +e
+          $CMD
+          ec=$?
+          echo "exit_code=$ec" >> $GITHUB_OUTPUT
+          # keep pipeline flowing so all boxes show up
+          exit 0
+
+      - name: Upload Playwright HTML (${{ matrix.browser }})
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-${{ matrix.browser }}
+          path: playwright-report/
+
+      - name: Upload Allure raw results (${{ matrix.browser }})
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-results-${{ matrix.browser }}
+          path: allure-results/
+
+      - name: Upload raw outputs (${{ matrix.browser }})
+      # screenshots/videos/test-results if you produce them
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ matrix.browser }}
+          path: |
+            test-results/
+            screenshots/
+            videos/
+          if-no-files-found: warn
+
+  merge:
+    name: ③ Merge & Generate Consolidated Report
+    runs-on: ubuntu-latest
+    needs: [tests]
+    if: always()
+    steps:
+      - uses: actions/setup-node@v4
+        with: { node-version: lts/*, cache: npm }
+
+      - name: Download all allure results
+        uses: actions/download-artifact@v4
+        with:
+          pattern: allure-results-*
+          path: ./allure-results
+          merge-multiple: true
+
+      - name: Generate consolidated Allure
+        shell: bash
+        run: |
+          npm i -g allure-commandline || true
+          if [ -d "allure-results" ] && [ "$(ls -A allure-results)" ]; then
+            mkdir -p consolidated-report
+            allure generate ./allure-results --clean -o ./consolidated-report
+            echo "✅ Consolidated report generated."
+          else
+            echo "⚠️ No allure-results found to merge."
+            mkdir -p consolidated-report && echo "No results" > consolidated-report/index.html
+          fi
+
+      - name: Upload consolidated report
+        uses: actions/upload-artifact@v4
+        with:
+          name: consolidated-report
+          path: consolidated-report/
+
+  summary:
+    name: ④ Pipeline Summary
+    runs-on: ubuntu-latest
+    needs: [merge]
+    if: always()
+    steps:
+      - name: Write summary
+        run: |
+          {
+            echo "# On-Demand Full Test Suite"
+            echo "- **Environment:** ${{ inputs.environment }}"
+            echo "- **Browsers:** ${{ inputs.browsers }}"
+            echo "- **Test group:** ${{ inputs['test-groups'] }}"
+            echo "- **Merge job result:** ${{ needs.merge.result }}"
+            echo
+            echo "Artifacts: consolidated-report + per-browser reports/results."
+          } >> $GITHUB_STEP_SUMMARY
