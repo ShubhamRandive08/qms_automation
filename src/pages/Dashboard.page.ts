@@ -29,7 +29,8 @@ export class DashboardPage extends BasePage {
     
     // Check dashboard header
     await expect(this.page.locator(this.dashboardHeader)).toBeVisible();
-    console.log('Dashboard header is visible');
+    console.log(' Dashboard header is visible');
+
   }
 
   async logout(): Promise<void> {
