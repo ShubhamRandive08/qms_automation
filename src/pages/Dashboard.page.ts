@@ -13,27 +13,27 @@ export class DashboardPage extends BasePage {
   }
 
   async validateDashboard(): Promise<void> {
-    console.log('🔍 Validating dashboard elements...');
+    console.log('Validating dashboard elements...');
     
     // Check URL
     expect(this.page.url()).toContain('/dashboard/index');
-    console.log(`✅ Dashboard URL: ${this.page.url()}`);
+    console.log(`Dashboard URL: ${this.page.url()}`);
     
     // Check title
     await expect(this.page).toHaveTitle(/OrangeHRM/);
-    console.log('✅ Page title contains "OrangeHRM"');
+    console.log('Page title contains "OrangeHRM"');
     
     // Check user dropdown
     await expect(this.page.locator(this.userDropdown)).toBeVisible();
-    console.log('✅ User dropdown is visible (logged in state)');
+    console.log('User dropdown is visible (logged in state)');
     
     // Check dashboard header
     await expect(this.page.locator(this.dashboardHeader)).toBeVisible();
-    console.log('✅ Dashboard header is visible');
+    console.log(' Dashboard header is visible');
   }
 
   async logout(): Promise<void> {
-    console.log('👤 Logging out...');
+    console.log('Logging out...');
     
     await this.clickButton(this.userDropdown);
     await this.clickButton(this.logoutButton);
@@ -43,7 +43,7 @@ export class DashboardPage extends BasePage {
     
     // Verify we're back on login page
     await expect(this.page.locator('button[type="submit"]')).toBeVisible();
-    console.log('✅ Logout successful, redirected to login page');
+    console.log('Logout successful, redirected to login page');
   }
 
   async isDashboardVisible(): Promise<boolean> {

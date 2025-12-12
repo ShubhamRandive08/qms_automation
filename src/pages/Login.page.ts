@@ -24,17 +24,17 @@ export class LoginPage extends BasePage {
     
     // Check page title
     await expect(this.page).toHaveTitle(/OrangeHRM/);
-    console.log('✅ Page title contains "OrangeHRM"');
+    console.log('Page title contains "OrangeHRM"');
     
     // Check logo
     await expect(this.page.locator(this.logo)).toBeVisible();
-    console.log('✅ Logo is visible');
+    console.log('Logo is visible');
     
     // Check form elements
     await expect(this.page.locator(this.usernameInput)).toBeVisible();
     await expect(this.page.locator(this.passwordInput)).toBeVisible();
     await expect(this.page.locator(this.loginButton)).toBeVisible();
-    console.log('✅ All login form elements are present');
+    console.log('All login form elements are present');
   }
 
   async login(username: string = config.USERNAME1, password: string = config.PASSWORD1): Promise<void> {
@@ -46,7 +46,7 @@ export class LoginPage extends BasePage {
     
     // Wait for navigation to dashboard
     await this.page.waitForURL('**/dashboard/index**', { timeout: config.TIMEOUT });
-    console.log('✅ Successfully logged in and navigated to dashboard');
+    console.log('Successfully logged in and navigated to dashboard');
   }
 
   async loginWithInvalidCredentials(username: string = 'InvalidUser', password: string = 'WrongPassword123'): Promise<void> {
@@ -62,18 +62,18 @@ export class LoginPage extends BasePage {
     const errorLocator = this.page.locator(this.errorMessage);
     await expect(errorLocator).toBeVisible();
     await expect(errorLocator).toContainText('Invalid credentials');
-    console.log('✅ Invalid credentials error displayed correctly');
+    console.log('Invalid credentials error displayed correctly');
   }
 
   async attemptLoginWithoutCredentials(): Promise<void> {
-    console.log('👤 Attempting login without credentials...');
+    console.log('Attempting login without credentials...');
     
     await this.clickButton(this.loginButton);
     
     // Check for required field messages
     const requiredFields = this.page.locator('.oxd-input-field-error-message');
     await expect(requiredFields).toHaveCount(2);
-    console.log('✅ Required field validations are displayed');
+    console.log('Required field validations are displayed');
   }
 
   async isLoginPage(): Promise<boolean> {

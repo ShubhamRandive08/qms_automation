@@ -6,7 +6,7 @@ export class BasePage {
   // Common methods for all pages
   async navigateTo(url: string): Promise<void> {
     await this.page.goto(url);
-    console.log(`🌐 Navigated to: ${url}`);
+    console.log(`Navigated to: ${url}`);
   }
 
   async getPageTitle(): Promise<string> {
@@ -29,13 +29,13 @@ export class BasePage {
   async fillField(selector: string, value: string): Promise<void> {
     const field = this.page.locator(selector);
     await field.fill(value);
-    console.log(`📝 Filled ${selector}: ${value}`);
+    console.log(`Filled ${selector}: ${value}`);
   }
 
   async clickButton(selector: string): Promise<void> {
     const button = this.page.locator(selector);
     await button.click();
-    console.log(`🖱️ Clicked: ${selector}`);
+    console.log(`Clicked: ${selector}`);
   }
 
   async isElementVisible(selector: string): Promise<boolean> {
