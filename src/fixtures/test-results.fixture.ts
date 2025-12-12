@@ -23,27 +23,27 @@ export const test = baseTest.extend<TestResultsFixture>({
 // Add global hooks for results handling
 test.beforeAll(() => {
   console.log('='.repeat(60));
-  console.log('🚀 Starting Test Execution');
+  console.log('Starting Test Execution');
   console.log('='.repeat(60));
-  console.log(`🌐 Environment: ${config.ENV}`);
-  console.log(`🔗 Base URL: ${config.BASE_URL}`);
-  console.log(`⚡ Headless: ${config.HEADLESS}`);
-  console.log(`⏱️ Timeout: ${config.TIMEOUT}ms`);
+  console.log(`Environment: ${config.ENV}`);
+  console.log(`Base URL: ${config.BASE_URL}`);
+  console.log(`Headless: ${config.HEADLESS}`);
+  console.log(`Timeout: ${config.TIMEOUT}ms`);
   console.log('='.repeat(60));
 });
 
 test.beforeEach(async ({}, testInfo) => {
-  console.log(`\n▶️ Starting test: ${testInfo.title}`);
-  console.log(`🏷️ Tags: ${Array.from(testInfo.tags).join(', ') || 'None'}`);
+  console.log(`\nStarting test: ${testInfo.title}`);
+  console.log(`Tags: ${Array.from(testInfo.tags).join(', ') || 'None'}`);
   
   // Store start time
   testStartTimes.set(testInfo.title, new Date());
 });
 
 test.afterEach(async ({ page, resultsHandler }, testInfo) => {
-  console.log(`\n📊 Test completed: ${testInfo.title}`);
-  console.log(`📈 Status: ${testInfo.status}`);
-  console.log(`⏱️ Duration: ${testInfo.duration}ms`);
+  console.log(`\nTest completed: ${testInfo.title}`);
+  console.log(`Status: ${testInfo.status}`);
+  console.log(`Duration: ${testInfo.duration}ms`);
   
   // Get start time from our map
   const testStartTime = testStartTimes.get(testInfo.title);
@@ -56,9 +56,9 @@ test.afterEach(async ({ page, resultsHandler }, testInfo) => {
   if (status === 'FAILED') {
     try {
       screenshotBuffer = await page.screenshot({ fullPage: true });
-      console.log('📸 Captured screenshot for failed test');
+      console.log('Captured screenshot for failed test');
     } catch (screenshotError) {
-      console.log('⚠️ Could not capture screenshot:', screenshotError);
+      console.log('Could not capture screenshot:', screenshotError);
     }
   }
   
@@ -93,13 +93,13 @@ test.afterEach(async ({ page, resultsHandler }, testInfo) => {
       }
     );
     
-    console.log(`✅ Result saved for: ${testInfo.title}`);
+    console.log(`Result saved for: ${testInfo.title}`);
     
     // Clean up start time entry
     testStartTimes.delete(testInfo.title);
     
   } catch (error) {
-    console.error('❌ Error saving test result:', error);
+    console.error('Error saving test result:', error);
     
     // Emergency logging
     try {
@@ -109,16 +109,16 @@ test.afterEach(async ({ page, resultsHandler }, testInfo) => {
         { flag: 'a' }
       );
     } catch (logError) {
-      console.error('💥 Emergency logging also failed:', logError);
+      console.error('Emergency logging also failed:', logError);
     }
   }
   
-  console.log(`🏁 Finished test: ${testInfo.title}\n`);
+  console.log(`Finished test: ${testInfo.title}\n`);
 });
 
 test.afterAll(async () => {
   console.log('\n' + '='.repeat(60));
-  console.log('🏁 Test Suite Completed');
+  console.log('Test Suite Completed');
   console.log('='.repeat(60));
   
   // Generate summary report
@@ -131,8 +131,8 @@ Generated: ${new Date().toISOString()}
 Environment: ${config.ENV}
 Base URL: ${config.BASE_URL}
 
-📁 Results stored in: ${path.resolve('test-results')}
-📊 View individual test results in: test-results/suites/
+Results stored in: ${path.resolve('test-results')}
+View individual test results in: test-results/suites/
 
 For detailed reports, run:
 - npm run report (for HTML report)
@@ -142,12 +142,12 @@ For detailed reports, run:
     `;
     
     fs.writeFileSync(summaryPath, summary);
-    console.log(`📄 Summary report saved: ${summaryPath}`);
+    console.log(`Summary report saved: ${summaryPath}`);
   } catch (error) {
-    console.log('⚠️ Could not create summary report:', error);
+    console.log('Could not create summary report:', error);
   }
   
-  console.log('🎉 All tests completed! Check test-results folder for detailed reports.');
+  console.log('All tests completed! Check test-results folder for detailed reports.');
   console.log('='.repeat(60));
 });
 

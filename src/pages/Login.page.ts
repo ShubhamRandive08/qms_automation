@@ -20,7 +20,7 @@ export class LoginPage extends BasePage {
   }
 
   async validateLoginPage(): Promise<void> {
-    console.log('🔍 Validating login page elements...');
+    console.log('Validating login page elements...');
     
     // Check page title
     await expect(this.page).toHaveTitle(/OrangeHRM/);
@@ -38,7 +38,7 @@ export class LoginPage extends BasePage {
   }
 
   async login(username: string = config.USERNAME1, password: string = config.PASSWORD1): Promise<void> {
-    console.log(`👤 Logging in with username: ${username}`);
+    console.log(`Logging in with username: ${username}`);
     
     await this.fillField(this.usernameInput, username);
     await this.fillField(this.passwordInput, password);
@@ -50,7 +50,7 @@ export class LoginPage extends BasePage {
   }
 
   async loginWithInvalidCredentials(username: string = 'InvalidUser', password: string = 'WrongPassword123'): Promise<void> {
-    console.log(`👤 Attempting login with invalid credentials...`);
+    console.log(`Attempting login with invalid credentials...`);
     
     await this.fillField(this.usernameInput, username);
     await this.fillField(this.passwordInput, password);
