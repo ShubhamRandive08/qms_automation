@@ -9,7 +9,7 @@ const envFile = `.env.${env}`;
 const result = dotenv.config({ path: path.resolve(process.cwd(), envFile) });
 
 if (result.error) {
-  console.warn(`⚠️ ${envFile} not found, trying default .env file`);
+  console.warn(`${envFile} not found, trying default .env file`);
   dotenv.config(); // Load default .env
 }
 
