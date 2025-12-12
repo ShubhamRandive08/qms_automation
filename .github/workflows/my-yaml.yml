@@ -1,28 +1,29 @@
-name : My First Yaml File
+name: My First Yaml File
 
-on :
-    push :
-        branches : ['main']
-    pull_request : 
-        branches : ['main']
+on:
+  push:
+    branches: ['main']
+  pull_request:
+    branches: ['main']
 
-jobs :
-    build : 
-        runs-on : ubuntu-latest
-        strategy :
-            matrix :
-                node-version : [14.x, 16.x, 18.x]
-
-        steps : 
-        - uses : actions/checkout@v4
-        - name : Use NodeJS ${{matrix.node-version}}
-          uses : actions/setup-node@v3
-          with :
-            node-version : ${{matrix.node-version}}
-            cache : npm
-
-        - name : "Install Dependancies"
-          run : npm i
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x]  # Updated to supported versions
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
           
-        - name : "Running Test"
-          run : npm run test
+      - name: Install Dependencies
+        run: npm ci  # Changed from 'npm i' to 'npm ci' for consistency
+        
+      - name: Running Test
+        run: npm run test
