@@ -32,8 +32,8 @@ jobs :
 
          - name : Run Tests 
            run : npm run test
-           env : 
-            BASE_URL : http://opensource-demo.orangehrmlive.com
-            ENV : qa
-            HEADLESS : true
-            TIMEOUT : 3000
+          #  env : 
+          #   BASE_URL : http://opensource-demo.orangehrmlive.com
+          #   ENV : qa
+          #   HEADLESS : true
+          #   TIMEOUT : 3000
