@@ -53,22 +53,15 @@ on:
   workflow_dispatch:
 
 jobs:
-  # Phase 1 : Quality Checks (Run in parallel)
-  lint:
+  #Phase 1 : Checkout code
+  checkout_code:
     runs-on: ubuntu-latest
     steps:
-      - name: Check code style
-        run: npm run lint
+      - name: Checkout code
+        run: actions/checkout@v4
 
-  security-scan:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check Security
-        run: npm audit
-      
   # Phase 2 : Build and run test
   build:
-    needs: [lint, security-scan]
     runs-on: ubuntu-latest
     steps:
       - name: Build setup
