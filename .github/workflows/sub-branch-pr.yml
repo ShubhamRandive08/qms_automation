@@ -54,23 +54,25 @@ on:
 
 jobs:
   #Phase 1 : Checkout code
-  checkout_code:
+  # checkout_code:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@v4
+
+  # Phase 2 : Build and run test
+  build:
+    # needs: checkout_code
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-  # Phase 2 : Build and run test
-  build:
-    needs: checkout_code
-    runs-on: ubuntu-latest
-    steps:
         # Setup node
       - name : Set up node
         uses : actions/setup-node@v4
         with :
              node-version : '18'
-            #  cache : 'npm'
+             cache : 'npm'
 
       # Install dependancies
       - name: Install Dependancies
