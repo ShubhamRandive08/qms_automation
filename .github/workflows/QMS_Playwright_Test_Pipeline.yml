@@ -1,0 +1,108 @@
+name: QMS Playwright Test Pipeline
+
+on:
+  push:
+    branches:
+      - Qms-Pranav
+      - Qms-Shubham
+
+  pull_request:
+    branches:
+      - Qms-Pranav
+      - Qms-Shubham
+
+  workflow_dispatch:
+
+  schedule:
+    - cron: "0 0 * * 0"   # Every Sunday
+
+jobs:
+  playwright-tests:
+    name: Playwright UI Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    env:
+      BASE_URL: https://opensource-demo.orangehrmlive.com
+      USERNAME: ${{ secrets.TEST_USERNAME }}
+      PASSWORD: ${{ secrets.TEST_PASSWORD }}
+
+    steps:
+      # 1. Checkout code
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      # 2. Setup Node.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # 3. Install Dependencies
+      - name: Install Dependencies
+        run: npm ci
+
+      # 4. Install Playwright Browsers
+      - name: Install Playwright Browsers
+        run: npx playwright install --with-deps
+
+      # 5. Run Playwright Tests
+      - name: Run Playwright Tests
+        run: |
+          npx playwright test --reporter=html,junit
+
+      # 6. Upload Playwright HTML Report
+      - name: Upload HTML Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-html-report
+          path: playwright-report
+
+      # 7. Upload Test Results (XML / Logs / Screenshots)
+      - name: Upload Test Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: |
+            test-results
+            screenshots
+            videos
+
+      # 8. Generate Allure Report
+      - name: Generate Allure Report
+        if: always()
+        run: |
+          npm install -g allure-commandline
+          allure generate allure-results --clean -o allure-report
+
+      # 9. Upload Allure Report
+      - name: Upload Allure Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-report
+          path: allure-report
+
+      # 10. Send Email Notification
+      - name: Send Email Notification
+        if: always()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+          username: ${{ secrets.EMAIL_USERNAME }}
+          password: ${{ secrets.EMAIL_PASSWORD }}
+          subject: "QMS Playwright Pipeline Result - ${{ job.status }}"
+          to: ${{ secrets.NOTIFICATION_EMAIL }}
+          from: GitHub Actions
+          body: |
+            Pipeline Status: ${{ job.status }}
+
+            Branch: ${{ github.ref_name }}
+            Repository: ${{ github.repository }}
+            Workflow: ${{ github.workflow }}
+
+            Check GitHub Actions for detailed report and artifacts.
