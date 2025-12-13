@@ -39,7 +39,7 @@ jobs:
       # 5. UPDATED: Setup QA environment (DEFAULT SETUP - no .env.qa needed)
       - name: Setup QA Environment
         run: |
-          echo "🔧 Setting up QA Environment with DEFAULTS"
+          echo "Setting up QA Environment with DEFAULTS"
           
           # Create .env file with QA defaults
           cat > .env << 'EOF'
@@ -66,7 +66,7 @@ jobs:
           
           # Display configuration
           echo ""
-          echo "📋 QA Environment Configuration:"
+          echo "QA Environment Configuration:"
           echo "=================================="
           cat .env
           echo "=================================="
