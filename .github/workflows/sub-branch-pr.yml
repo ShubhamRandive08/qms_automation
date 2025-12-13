@@ -1,43 +1,106 @@
-name : Sub Branch PR and Push
+# name : Sub Branch PR and Push
 
-on : 
-    schedule :
-        - cron :  '0 9 * * 0'
-    push : 
-        branches : [Qms-Pranav, Qms-Shubham]
-    pull_request :
-        branches : [Qms-Pranav, Qms-Shubham]
-    workflow_dispatch :
+# on : 
+#     schedule :
+#         - cron :  '0 9 * * 0'
+#     push : 
+#         branches : [Qms-Pranav, Qms-Shubham]
+#     pull_request :
+#         branches : [Qms-Pranav, Qms-Shubham]
+#     workflow_dispatch :
 
-jobs :
-    run-sub-branch :
-        runs-on : ubuntu-latest
+# jobs :
+#     run-sub-branch :
+#         runs-on : ubuntu-latest
 
-        steps : 
-        #1 Checkout Code
-         - name : Checkout code
-           uses : actions/checkout@v4
+#         steps : 
+#         #1 Checkout Code
+#          - name : Checkout code
+#            uses : actions/checkout@v4
 
-        # 2. Set up node
-         - name : Set up node
-           uses : actions/setup-node@v4
-           with :
-             node-version : '18'
-             cache : 'npm'
+#         # 2. Set up node
+#          - name : Set up node
+#            uses : actions/setup-node@v4
+#            with :
+#              node-version : '18'
+#              cache : 'npm'
 
-        # 3. install dependencies
-         - name : Install dependencies
-           run : npm ci
+#         # 3. install dependencies
+#          - name : Install dependencies
+#            run : npm ci
 
-        # 4. Install playwright
-         - name : Install playwright
-           run : npx playwright install --with-deps chromium
+#         # 4. Install playwright
+#          - name : Install playwright
+#            run : npx playwright install --with-deps chromium
 
-        # 5. Run testcases.
-         - name : Run Tests 
-           run : npm run test
+#         # 5. Run testcases.
+#          - name : Run Tests 
+#            run : npm run test
 
 
+
+name: Run On Sub brach Push Or Raise PR
+
+on:
+  schedule: 
+    - cron: '0 9 * * 0'
+
+  push:
+    branches: [Qms-Shubham, Qms-Pranav]
+  pull_request:
+    branches: [Qms-Shubham, Qms-Pranav]
+
+  workflow_dispatch:
+
+jobs:
+  # Phase 1 : Quality Checks (Run in parallel)
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check code style
+        run: npm run lint
+
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Security
+        run: npm audit
+      
+  # Phase 2 : Build and run test
+  build:
+    needs: [lint, security-scan]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build setup
+        run: npm run build
+      - name: Upload Build
+        uses: actions/upload-artifact@v4
+        with:
+          name: Build Artifact
+          path: dist/ 
+
+        # Setup node
+      - name: Set up node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: npm
+
+      # Install dependancies
+      - name: Install Dependancies
+        run: npm ci
+
+      # Install Playwright
+      - name: Install playwright
+        run: npx playwright install --with-deps chromium
+        
+
+  run-test:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run tests
+        run: npm run test
 
 
 
