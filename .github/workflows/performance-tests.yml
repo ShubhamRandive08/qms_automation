@@ -8,7 +8,7 @@ on:
       environment:
         description: 'Environment'
         required: true
-        default: 'prod'
+        default: 'qa'
         type: choice
         options: ['staging', 'prod']
 
@@ -73,5 +73,5 @@ jobs:
       - name: Alert on Performance Degradation
         if: failure()
         run: |
-          echo "📉 PERFORMANCE DEGRADATION DETECTED!"
+          echo "PERFORMANCE DEGRADATION DETECTED!"
           echo "Some tests exceeded performance thresholds"
