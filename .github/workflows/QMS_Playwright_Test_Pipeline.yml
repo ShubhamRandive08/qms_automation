@@ -1,6 +1,6 @@
-name: QMS Playwright Test Pipeline
+name: QMS Playwright Test Pipeline # Name of the pipeline
 
-on:
+on: # This key indicates when this pipeline wil trigger.
   push:
     branches:
       - Qms-Pranav
@@ -14,10 +14,10 @@ on:
   workflow_dispatch:
 
   schedule:
-    - cron: "0 0 * * 0"   # Every Sunday
+    - cron: "0 0 * * 0"   # Every Sunday at 12AM
 
-jobs:
-  playwright-tests:
+jobs: # Configuration field/YAML keys
+  playwright-tests: # Job 1
     name: Playwright UI Tests
     runs-on: ubuntu-latest
     timeout-minutes: 30
